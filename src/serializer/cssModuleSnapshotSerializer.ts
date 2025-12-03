@@ -7,7 +7,7 @@ const visitedNodes = new Set();
  * @param {*} nodes The array of nodes to add to.
  * @returns {Array} The array of nodes.
  */
-const getNodes = (node, nodes = []) => {
+const getNodes = (node: any, nodes: any[] = []) => {
   if (typeof node === 'object') {
     nodes.push(node);
   }
@@ -24,8 +24,8 @@ const getNodes = (node, nodes = []) => {
  * finds all elements which are using CSS module class names, and serializes the associated styles
  * into the snapshot.
  */
-const cssModuleSnapshotSerializer = {
-  test: (val) => {
+export const cssModuleSnapshotSerializer = {
+  test: (val: any) => {
     // Skip any nodes which have already been 'visited'.
     if (visitedNodes.has(val)) {
       return false;
@@ -38,7 +38,7 @@ const cssModuleSnapshotSerializer = {
 
     return true;
   },
-  serialize: (val, config, indentation, depth, refs, printer) => {
+  serialize: (val: any, config: any, indentation: any, depth: any, refs: any, printer: any) => {
     // Get all nodes that are children of the root node and add them to the visited nodes set.
     const nodes = getNodes(val);
     nodes.forEach((node) => visitedNodes.add(node));
@@ -54,7 +54,7 @@ const cssModuleSnapshotSerializer = {
     // Cleanup
     nodes.forEach((node) => visitedNodes.delete(node));
 
-    if (styleElements.size === 0) {
+    if (styleElements.length === 0) {
       return code;
     }
 
@@ -66,5 +66,3 @@ const cssModuleSnapshotSerializer = {
     return `${!serializedStyleElements.length ? '' : `${serializedStyleElements}\n`}${code.trim()}`;
   },
 };
-
-module.exports = { cssModuleSnapshotSerializer };

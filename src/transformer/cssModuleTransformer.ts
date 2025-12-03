@@ -1,9 +1,9 @@
 /* eslint-disable import/no-default-export */
-const fs = require('fs');
-const crypto = require('crypto');
+import fs from 'fs';
+import crypto from 'crypto';
 
-const crossSpawn = require('cross-spawn');
-const sass = require('sass');
+import crossSpawn from 'cross-spawn';
+import sass from 'sass';
 
 const THIS_FILE = fs.readFileSync(__filename);
 
@@ -41,7 +41,7 @@ async function processCss({ css, fileName }) {
  *
  * As nasty as it is, it's the only workable approach, see https://x.com/kentcdodds/status/1043194634338324480.
  */
-const runPostCss = (css, fileName) => {
+const runPostCss = (css: string, fileName: string) => {
   const result = crossSpawn.sync('node', [
     '-e',
     `(${runner})(${JSON.stringify({ css, fileName })}).then((result) => console.log(JSON.stringify(result)))`,
@@ -57,7 +57,7 @@ const runPostCss = (css, fileName) => {
  * This is the exact same thing the 'rollup-plugin-sass' plugin does, but we do it ourselves here
  * since the CSS -> JS modules aren't built.
  */
-const styleInjector = (css, exports) => `
+const styleInjector = (css: string, exports: Record<string, string>) => `
 const styles = \`${css}\`;
 const styleElement = document.createElement('style');
 styleElement.innerHTML = styles;
@@ -72,8 +72,8 @@ module.exports = ${JSON.stringify(exports)};
  * Jest transformer for SASS module files. It compiles the SASS file, processes it with PostCSS (and postcss-modules),
  * and returns transformed module code that injects the styles into the DOM and exports CSS module class names.
  */
-module.exports = {
-  getCacheKey: (fileData, fileName) => {
+const transformer = {
+  getCacheKey: (fileData: string, fileName: string) => {
     // Generate a cache key for the given CSS module, using the file name, data, and the code for this transformer (since
     // transformers are cached globally by Jest).
     return crypto
@@ -85,7 +85,7 @@ module.exports = {
       .update(fileName)
       .digest('hex');
   },
-  process: (sourceText, sourcePath) => {
+  process: (sourceText: string, sourcePath: string) => {
     // Compile the SASS file, passing the file URL to the compiler so it can resolve imports
     const compiledSass = sass.compileString(sourceText, {
       url: new URL(`file://${sourcePath}`),
@@ -106,3 +106,5 @@ module.exports = {
     };
   },
 };
+
+export default transformer;
