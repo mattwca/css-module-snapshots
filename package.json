@@ -11,10 +11,10 @@
       "types": "./dist/index.d.ts"
     },
     "./transformer": {
-      "require": "./dist/transformer/cssModuleTransformer.cjs"
+      "require": "./dist/transformer/cssModuleTransformer.js"
     },
     "./serializer": {
-      "require": "./dist/serializer/cssModuleSnapshotSerializer.cjs"
+      "require": "./dist/serializer/cssModuleSnapshotSerializer.js"
     },
     "./matchers": {
       "require": "./dist/matchers/index.js",
@@ -28,8 +28,8 @@
     "README.md"
   ],
   "scripts": {
-    "build": "npm run build:cjs && npm run build:esm && npm run build:types",
-    "build:cjs": "tsc --module commonjs --outDir dist",
+    "build": "npm run build:main && npm run build:types",
+    "build:main": "tsc --module commonjs --outDir dist",
     "build:esm": "tsc --module esnext --outDir dist --declarationDir dist/types",
     "build:types": "tsc --declaration --emitDeclarationOnly --outDir dist",
     "prepublishOnly": "npm run build",
