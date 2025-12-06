@@ -7,7 +7,7 @@ const visitedNodes = new Set();
  * @param {*} nodes The array of nodes to add to.
  * @returns {Array} The array of nodes.
  */
-const getNodes = (node: any, nodes: any[] = []) => {
+const getNodes = (node: Element, nodes: Element[] = []) => {
   if (typeof node === 'object') {
     nodes.push(node);
   }
@@ -25,7 +25,7 @@ const getNodes = (node: any, nodes: any[] = []) => {
  * into the snapshot.
  */
 export const cssModuleSnapshotSerializer = {
-  test: (val: any) => {
+  test: (val: Node) => {
     // Skip any nodes which have already been 'visited'.
     if (visitedNodes.has(val)) {
       return false;
@@ -43,16 +43,18 @@ export const cssModuleSnapshotSerializer = {
     const nodes = getNodes(val);
     nodes.forEach((node) => visitedNodes.add(node));
 
-    // Find all style elements in the document head which have the `data-css-module` attribute added by our CSS module transformer.
+    // Find all style elements in the document head which have the `data-css-module` attribute added 
+    // by the CSS module transformer.
     const styleElements = Array.from(document.head.querySelectorAll('style[data-css-module]'));
 
     // Serialize the DOM elements using the default jest serializer(s).
     const code = printer(val, config, indentation, depth, refs);
 
-    // TODO - Unused class removal
-
     // Cleanup
     nodes.forEach((node) => visitedNodes.delete(node));
+
+    // We could clean up unused styles here, but that would require parsing CSS and doing some selector
+    // matching.
 
     if (styleElements.length === 0) {
       return code;
