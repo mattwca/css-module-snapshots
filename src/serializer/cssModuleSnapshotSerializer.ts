@@ -54,7 +54,7 @@ export const cssModuleSnapshotSerializer = {
     nodes.forEach((node) => visitedNodes.delete(node));
 
     // We could clean up unused styles here, but that would require parsing CSS and doing some selector
-    // matching.
+    // matching, and I'm not entirely sure of the benefit.
 
     if (styleElements.length === 0) {
       return code;
