@@ -1,12 +1,12 @@
-# css-modules-snapshots
+# @mattwca/css-modules-snapshots
 
-A comprehensive Jest plugin for CSS Modules snapshot testing. This package provides a transformer, serializer, and custom matchers to make testing CSS Modules easier and more reliable.
+A comprehensive Jest plugin for CSS Modules snapshot testing. This package provides a transformer, serializer, and a custom matcher to make testing CSS Modules easier and more reliable.
 
 ## Features
 
-- **CSS Module Transformer**: Transform CSS/SCSS files during Jest tests
-- **Snapshot Serializer**: Automatically include CSS module styles in your snapshots
-- **Custom Matchers**: Additional Jest matchers for CSS-specific assertions
+- **CSS Module Transformer**: Transforms CSS/SCSS files during Jest tests.
+- **Snapshot Serializer**: Automatically includes CSS module styles in your testing snapshots.
+- **Custom Matchers**: Adds a `expect(...).toHaveCssStyle` matcher, that allows you to verify a style rule is applied to an element.
 
 ## Installation
 
@@ -16,7 +16,7 @@ npm install --save-dev css-modules-snapshots
 
 ## Usage
 
-### 1. CSS Module Transformer
+### 1. CSS Module Transformer (required)
 
 Add the transformer to your Jest configuration to handle CSS/SCSS imports:
 
@@ -33,43 +33,33 @@ The transformer:
 - Compiles SCSS files using Sass
 - Processes CSS with PostCSS and postcss-modules
 - Injects styles into the DOM for testing
-- Exports CSS module class names
 
 ### 2. Snapshot Serializer
 
 Add the serializer to your Jest configuration to include CSS module styles in snapshots:
 
-**jest.config.js:**
+In your project root:
+**src/index.js:**
 ```javascript
-module.exports = {
-  snapshotSerializers: ['css-modules-snapshots/serializer'],
-};
+import 'css-module-snapshots';
 ```
 
 The serializer will automatically:
 - Find all CSS module styles in your rendered components
 - Include them in your snapshot output
-- Make your snapshots more comprehensive and easier to review
 
 ### 3. Custom Matchers
 
 Import and extend Jest matchers in your test setup file:
 
-**jest.setup.js:**
+In your project root:
+**src/index.js:**
 ```javascript
-import { matchers } from 'css-modules-snapshots/matchers';
-
-expect.extend(matchers);
+import 'css-module-snapshots';
 ```
 
-Then add to your Jest configuration:
-
-**jest.config.js:**
-```javascript
-module.exports = {
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
-};
-```
+This will add the `toHaveCssStyle` matcher, which:
+- Allows you to verify that a given element has a set of expected style properties to be applied.
 
 ## Complete Jest Configuration Example
 
