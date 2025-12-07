@@ -3,35 +3,26 @@
   "version": "1.0.0",
   "description": "Jest plugin for CSS Modules snapshot testing with transformer, serializer, and custom matchers",
   "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "types": "types/index.d.ts",
   "exports": {
     ".": {
+      "types": "./types/index.d.ts",
       "require": "./dist/index.js",
-      "import": "./dist/index.mjs",
-      "types": "./dist/index.d.ts"
+      "import": "./dist/index.mjs"
     },
     "./transformer": {
       "require": "./dist/transformer/cssModuleTransformer.js"
-    },
-    "./serializer": {
-      "require": "./dist/serializer/cssModuleSnapshotSerializer.js"
-    },
-    "./matchers": {
-      "require": "./dist/matchers/index.js",
-      "import": "./dist/matchers/index.mjs",
-      "types": "./dist/matchers/index.d.ts"
     }
   },
   "files": [
     "dist",
     "src",
-    "README.md"
+    "types"
   ],
   "scripts": {
-    "build": "npm run build:main && npm run build:types",
+    "build": "npm run build:main",
     "build:main": "tsc --module commonjs --outDir dist",
-    "build:esm": "tsc --module esnext --outDir dist --declarationDir dist/types",
-    "build:types": "tsc --declaration --emitDeclarationOnly --outDir dist",
+    "build:esm": "tsc --module esnext --outDir dist",
     "prepublishOnly": "npm run build",
     "test": "jest",
     "lint": "eslint src --ext .ts,.js,.cjs"
@@ -48,6 +39,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@adobe/css-tools": "^4.4.4",
     "cross-spawn": "^7.0.3",
     "postcss": "^8.4.31",
     "postcss-modules": "^6.0.0",

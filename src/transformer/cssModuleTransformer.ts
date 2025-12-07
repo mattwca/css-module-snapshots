@@ -57,11 +57,11 @@ const runPostCss = (css: string, fileName: string) => {
  * This is the exact same thing the 'rollup-plugin-sass' plugin does, but we do it ourselves here
  * since the CSS -> JS modules aren't built.
  */
-const styleInjector = (css: string, exports: Record<string, string>) => `
+const styleInjector = (css: string, hash: string, exports: Record<string, string>) => `
 const styles = \`${css}\`;
 const styleElement = document.createElement('style');
 styleElement.innerHTML = styles;
-styleElement.setAttribute('data-css-module', 'true');
+styleElement.setAttribute('data-css-module', ${JSON.stringify(hash)});
 
 document.head.appendChild(styleElement);
 
@@ -97,8 +97,11 @@ const transformer = {
     // Parse the output result from the child process.
     const postCssResult = JSON.parse(result.stdout.toString().trim());
 
+    // Hash the file path to create a unique identifier for the style element.
+    const hash = crypto.createHash('md5').update(sourcePath).digest('hex');
+
     // Build the final module code that injects the styles into the DOM and exports the CSS module class names.
-    const finalModuleCode = styleInjector(postCssResult.css, postCssResult.exports);
+    const finalModuleCode = styleInjector(postCssResult.css, hash, postCssResult.exports);
 
     return {
       code: finalModuleCode,
