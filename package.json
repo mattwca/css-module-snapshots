@@ -1,7 +1,7 @@
 {
-  "name": "css-modules-snapshots",
+  "name": "@mattwca/css-module-snapshots",
   "version": "1.0.0",
-  "description": "Jest plugin for CSS Modules snapshot testing with transformer, serializer, and custom matchers",
+  "description": "Adds support for testing when using CSS Modules in Jest, including snapshots and style matching.",
   "main": "dist/index.js",
   "types": "types/index.d.ts",
   "exports": {
