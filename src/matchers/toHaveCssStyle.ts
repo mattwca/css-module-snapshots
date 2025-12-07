@@ -26,17 +26,20 @@ export const toHaveCssStyle: MatcherFunction<[expectedStyles: Record<string, str
   const styleRules = CSSModuleSnapshotsContext.instance.styleRules;
   const matchingStyleRules = styleRules.filter((rule) => rule.selectors.some((selector) => actual.matches(selector)));
 
-  // Find whether there is a style rule that matches one of the expected style properties.
-  const hasMatchingStyleRule = Object.entries(expectedStyles).every(([property, value]) => {
-    return matchingStyleRules.some((rule) => {
+  // Find whether there is a style rule that matches each of the expected style properties.
+  const hasMatchingStyleRule = Object
+    .entries(expectedStyles)
+    .every(([property, value]) => matchingStyleRules.some((rule) => {
+      // Get only property declarations (ignore comments, etc).
       const propertyDeclarations = rule.declarations.filter((declaration) => declaration.type === 'declaration' );
+
+      // Check whether any of the properties within this rule match the expected property and value.
       return propertyDeclarations.some((declaration) => {
         const camelCaseProperty = kebabCaseToCamelCase(declaration.property);
         return camelCaseProperty === property && declaration.value === value.toString();
       });
-    });
-  });
-
+    })
+  );
 
   return {
     message: () => hasMatchingStyleRule ? '' : `Expected element to have CSS styles: ${JSON.stringify(expectedStyles)}`,
