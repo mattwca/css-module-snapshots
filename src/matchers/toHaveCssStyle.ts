@@ -2,26 +2,44 @@ import type { MatcherFunction } from 'expect';
 
 import { CSSModuleSnapshotsContext } from './context';
 
+const kebabCaseToCamelCase = (str: string) => {
+  return str.replace(/-([a-z])/g, (match, letter) => letter.toUpperCase());
+};
+
 export const toHaveCssStyle: MatcherFunction<[expectedStyles: Record<string, string | number>]> = function (actual, expectedStyles) {
   if (!(actual instanceof HTMLElement)) {
-    throw new Error(`[toHaveCssStyle] Expected a HTMLElement, received ${actual}`)
+    return {
+      message: () => `Expected a HTMLElement, received ${actual}`,
+      pass: false
+    }
+  }
+
+  if (Object.entries(expectedStyles).length === 0) {
+    return {
+      message: () => 'Expected at least one style property to check against',
+      pass: false
+    }
   }
 
   CSSModuleSnapshotsContext.instance.addStylesheetsToContext();
 
-  const styleDefinitions = CSSModuleSnapshotsContext.instance.styleRules;
-  const matchingStyleDefinitions = styleDefinitions.filter((definition) => definition.selectors.some((selector) => actual.matches(selector)));
+  const styleRules = CSSModuleSnapshotsContext.instance.styleRules;
+  const matchingStyleRules = styleRules.filter((rule) => rule.selectors.some((selector) => actual.matches(selector)));
 
-  // Find all style rules that match one of the expected style properties. Essentially, we go through each style definition (which contains
-  // a selector that matches the current element), and find any rule declarations that match one of the expected style properties.
-  // const matchingStyleRules = matchingStyleDefinitions.flatMap((definition) => {
-  //   definition.declarations.filter((declaration) => declaration.type === 'declaration' && 
-  // });
+  // Find whether there is a style rule that matches one of the expected style properties.
+  const hasMatchingStyleRule = Object.entries(expectedStyles).every(([property, value]) => {
+    return matchingStyleRules.some((rule) => {
+      const propertyDeclarations = rule.declarations.filter((declaration) => declaration.type === 'declaration' );
+      return propertyDeclarations.some((declaration) => {
+        const camelCaseProperty = kebabCaseToCamelCase(declaration.property);
+        return camelCaseProperty === property && declaration.value === value.toString();
+      });
+    });
+  });
 
-  console.log('Matching Style Definitions:', matchingStyleDefinitions);
 
   return {
-    message: () => 'This is a test response',
-    pass: true,
+    message: () => hasMatchingStyleRule ? '' : `Expected element to have CSS styles: ${JSON.stringify(expectedStyles)}`,
+    pass: hasMatchingStyleRule
   };
 };
