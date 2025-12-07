@@ -1,5 +1,5 @@
 {
-  "name": "@mattwca/css-module-snapshots",
+  "name": "@mattuk94/css-module-snapshots",
   "version": "1.0.0",
   "description": "Adds support for testing when using CSS Modules in Jest, including snapshots and style matching.",
   "main": "dist/index.js",
