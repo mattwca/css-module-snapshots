@@ -7,8 +7,7 @@
   "exports": {
     ".": {
       "types": "./types/index.d.ts",
-      "require": "./dist/index.js",
-      "import": "./dist/index.mjs"
+      "require": "./dist/index.js"
     },
     "./transformer": {
       "require": "./dist/transformer/cssModuleTransformer.js"
@@ -17,7 +16,8 @@
   "files": [
     "dist",
     "src",
-    "types"
+    "types",
+    "README.md"
   ],
   "scripts": {
     "build": "npm run build:main",

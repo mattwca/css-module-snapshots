@@ -1,10 +1,10 @@
-import { cssModuleSnapshotSerializer } from './serializer';
-import cssModuleTransformer from './transformer/cssModuleTransformer';
+import { cssModuleSnapshotSerializer } from './serializer/cssModuleSnapshotSerializer';
 import { toHaveCssStyle } from './matchers';
 
+// Add snapshot serializer
 expect.addSnapshotSerializer(cssModuleSnapshotSerializer);
+
+// Add custom matchers
 expect.extend({
   toHaveCssStyle,
 });
-
-export { cssModuleSnapshotSerializer as snapshotSerializer, cssModuleTransformer as transformer, toHaveCssStyle };
