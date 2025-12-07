@@ -34,12 +34,26 @@ The transformer:
 - Processes CSS with PostCSS and postcss-modules
 - Injects styles into the DOM for testing
 
-### 2. Snapshot Serializer
+### 2. Snapshot Serializer and Custom Matcher
 
-Add the serializer to your Jest configuration to include CSS module styles in snapshots:
+Add the serializer and `toHaveCssStyle` matcher to your Jest configuration:
 
-In your project root:
-**src/index.js:**
+In your jest config:
+
+**jest.config.js:**
+```javascript
+module.exports = {
+  testEnvironment: 'jsdom',
+  transform: {
+    '\\.(css|scss)$': 'css-modules-snapshots/transformer'
+  },
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+};
+```
+
+In your jest setup:
+
+**jest.setup.js:**
 ```javascript
 import 'css-module-snapshots';
 ```
@@ -48,17 +62,7 @@ The serializer will automatically:
 - Find all CSS module styles in your rendered components
 - Include them in your snapshot output
 
-### 3. Custom Matchers
-
-Import and extend Jest matchers in your test setup file:
-
-In your project root:
-**src/index.js:**
-```javascript
-import 'css-module-snapshots';
-```
-
-This will add the `toHaveCssStyle` matcher, which:
+The `toHaveCssStyle` matcher:
 - Allows you to verify that a given element has a set of expected style properties to be applied.
 
 ## Complete Jest Configuration Example
@@ -68,8 +72,7 @@ This will add the `toHaveCssStyle` matcher, which:
 module.exports = {
   testEnvironment: 'jsdom',
   transform: {
-    '\\.(css|scss)$': 'css-modules-snapshots/transformer',
-    '\\.(js|jsx|ts|tsx)$': 'babel-jest',
+    '\\.(css|scss)$': 'css-modules-snapshots/transformer'
   },
   snapshotSerializers: ['css-modules-snapshots/serializer'],
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
@@ -78,13 +81,28 @@ module.exports = {
 
 **jest.setup.js:**
 ```javascript
-import { matchers } from 'css-modules-snapshots/matchers';
-
-expect.extend(matchers);
+import 'css-module-snapshots';
 ```
 
 ## Example Test
 
+**Button.module.css:**
+```css
+.button {
+  background-color: blue;
+}
+```
+
+**Button.jsx:**
+```javascript
+import styles from './Button.module.css';
+
+export const Button = ({children)) => {
+  return (<button className={styles.button}>{children}</button>);
+};
+```
+
+**Button.test.jsx:**
 ```javascript
 import React from 'react';
 import { render } from '@testing-library/react';
@@ -93,10 +111,12 @@ import Button from './Button';
 
 describe('Button', () => {
   it('renders with correct styles', () => {
-    const { container } = render(<Button>Click me</Button>);
+    const { getByRole, asFragment } = render(<Button>Click me</Button>);
     
     // The snapshot will automatically include the CSS module styles
-    expect(container).toMatchSnapshot();
+    expect(asFragment()).toMatchSnapshot();
+
+    expect(getByRole('button')).toHaveCssStyle({ backgroundColor: 'blue' });
   });
 });
 ```
@@ -111,6 +131,8 @@ describe('Button', () => {
 
 3. **Snapshot Phase**: The serializer finds all injected CSS module styles and includes them in the snapshot output
 
+4. **Matcher**: The matcher will find all CSS module style definitions, parse them, and locate all rules which apply to the given element. The declarations within the matching rules are checked to see whether they contain all of the expected style rules.
+
 ## Dependencies
 
 This package requires:
@@ -121,23 +143,6 @@ Peer dependencies are automatically installed:
 - `sass`: For SCSS compilation
 - `postcss` & `postcss-modules`: For CSS module processing
 - `cross-spawn`: For synchronous PostCSS execution
-
-## TypeScript Support
-
-Full TypeScript definitions are included. For custom matchers, you may want to extend Jest types:
-
-**types/jest.d.ts:**
-```typescript
-import 'css-modules-snapshots/matchers';
-
-declare global {
-  namespace jest {
-    interface Matchers<R> {
-      // Add custom matcher type definitions here if needed
-    }
-  }
-}
-```
 
 ## License
 
