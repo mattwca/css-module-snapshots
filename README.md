@@ -1,4 +1,4 @@
-# @mattuk94/css-modules-snapshots
+# @mattwca/css-module-snapshots
 
 A comprehensive Jest plugin for CSS Modules snapshot testing. This package provides a transformer, serializer, and a custom matcher to make testing CSS Modules easier and more reliable.
 
@@ -11,7 +11,7 @@ A comprehensive Jest plugin for CSS Modules snapshot testing. This package provi
 ## Installation
 
 ```bash
-npm install --save-dev @mattuk94/css-modules-snapshots
+npm install --save-dev @mattwca/css-module-snapshots
 ```
 
 ## Usage
@@ -24,7 +24,7 @@ Add the transformer to your Jest configuration to handle CSS/SCSS imports:
 ```javascript
 module.exports = {
   transform: {
-    '\\.(css|scss)$': '@mattuk94/css-modules-snapshots/transformer',
+    '\\.(css|scss)$': '@mattwca/css-module-snapshots/transformer',
   },
 };
 ```
@@ -45,7 +45,7 @@ In your jest config:
 module.exports = {
   testEnvironment: 'jsdom',
   transform: {
-    '\\.(css|scss)$': '@mattuk94/css-modules-snapshots/transformer'
+    '\\.(css|scss)$': '@mattwca/css-module-snapshots/transformer'
   },
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
 };
@@ -55,7 +55,7 @@ In your jest setup:
 
 **jest.setup.js:**
 ```javascript
-import '@mattuk94/css-module-snapshots';
+require('@mattwca/css-module-snapshots');
 ```
 
 The serializer will automatically:
@@ -72,7 +72,7 @@ The `toHaveCssStyle` matcher:
 module.exports = {
   testEnvironment: 'jsdom',
   transform: {
-    '\\.(css|scss)$': '@mattuk94/css-modules-snapshots/transformer'
+    '\\.(css|scss)$': '@mattwca/css-module-snapshots/transformer'
   },
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
 };
@@ -80,7 +80,7 @@ module.exports = {
 
 **jest.setup.js:**
 ```javascript
-import '@mattuk94/css-module-snapshots';
+require('@mattwca/css-module-snapshots');
 ```
 
 ## Example Test
