@@ -1,34 +1,34 @@
-import css, { CssRuleAST, CssStylesheetAST } from '@adobe/css-tools';
+import { Stylesheet, StylesheetRule } from './Stylesheet';
 
 /**
  * Singleton context for the CSS module snapshots style matcher. Used to store parsed stylesheets and prevent
  * unecessary re-parsing of modules between different tests.
  */
-class CSSModuleSnapshotsContext {
+export class CSSModuleSnapshotsContext {
   public static instance = new CSSModuleSnapshotsContext();
 
   // Map of stylesheet hashes to parsed ASTs.
-  private styleSheets: Map<string, CssStylesheetAST>;
+  private styleSheets: Map<string, Stylesheet>;
 
   private constructor() {
     this.styleSheets = new Map();
   }
 
   /**
-   * Adds a stylesheet to the context, and parses to an AST.
+   * Adds a given stylesheet, with name and content, to the context.
    * 
    * If the stylesheet is already present, it will be skipped.
    *
-   * @param nameHash The hash of the CSS module name.
-   * @param styleSheet The stylesheet content.
+   * @param id The ID of the CSS module name.
+   * @param stylesheetContent The stylesheet content.
    */
-  addStyleSheet(nameHash: string, styleSheet: string) {
-    if (this.styleSheets.has(nameHash)) {
+  addStyleSheet(id: string, stylesheetContent: string) {
+    if (this.styleSheets.has(id)) {
       return;
     }
 
-    const compiledSheet = css.parse(styleSheet);
-    this.styleSheets.set(nameHash, compiledSheet);
+    const styleSheet = new Stylesheet(id, stylesheetContent);
+    this.styleSheets.set(id, styleSheet);
   }
 
   /**
@@ -49,16 +49,7 @@ class CSSModuleSnapshotsContext {
   /**
    * Gets all style rules from the stylesheets in the context.
    */
-  get styleRules(): CssRuleAST[] {
-    const definitions: CssRuleAST[] = [];
-
-    this.styleSheets.forEach((styleSheet) => {
-      const rules = Array.from(styleSheet.stylesheet.rules.values()).filter((rule): rule is CssRuleAST => rule.type === 'rule');
-      definitions.push(...rules);
-    });
-
-    return definitions;
+  get styleRules(): StylesheetRule[] {
+    return Array.from(this.styleSheets.values()).flatMap((stylesheet) => stylesheet.rulesArray);
   }
 };
-
-export { CSSModuleSnapshotsContext };

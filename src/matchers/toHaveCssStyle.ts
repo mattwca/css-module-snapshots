@@ -2,8 +2,26 @@ import type { MatcherFunction } from 'expect';
 
 import { CSSModuleSnapshotsContext } from './context';
 
-const kebabCaseToCamelCase = (str: string) => {
-  return str.replace(/-([a-z])/g, (match, letter) => letter.toUpperCase());
+type UnmatchedProperties = {
+  property: string;
+  value: string | number;
+}
+
+const camelCaseToKebabCase = (str: string) => {
+  return str.replace(/([A-Z])/g, (match) => `-${match.toLowerCase()}`);
+};
+
+const generateMessage = (unmatchedProperties: UnmatchedProperties[]) => {
+  if (unmatchedProperties.length === 0) {
+    return '';
+  }
+
+  const propertiesFormatted = unmatchedProperties.reduce((str, { property, value }) => {
+    return `${str}\n  ${property}: ${value};`;
+  }, '')
+
+  const result = `Element does not have the following expected styles: ${propertiesFormatted}`;
+  return result;
 };
 
 export const toHaveCssStyle: MatcherFunction<[expectedStyles: Record<string, string | number>]> = function (actual, expectedStyles) {
@@ -24,25 +42,29 @@ export const toHaveCssStyle: MatcherFunction<[expectedStyles: Record<string, str
   CSSModuleSnapshotsContext.instance.addStylesheetsToContext();
 
   const styleRules = CSSModuleSnapshotsContext.instance.styleRules;
-  const matchingStyleRules = styleRules.filter((rule) => rule.selectors.some((selector) => actual.matches(selector)));
+  const matchingStyleRules = styleRules.filter((rule) => actual.matches(rule.selectors));
+
+  const unmatchedProperties: { property: string; value: string | number }[] = [];
 
   // Find whether there is a style rule that matches each of the expected style properties.
   const hasMatchingStyleRule = Object
     .entries(expectedStyles)
-    .every(([property, value]) => matchingStyleRules.some((rule) => {
-      // Get only property declarations (ignore comments, etc).
-      const propertyDeclarations = rule.declarations.filter((declaration) => declaration.type === 'declaration' );
-
-      // Check whether any of the properties within this rule match the expected property and value.
-      return propertyDeclarations.some((declaration) => {
-        const camelCaseProperty = kebabCaseToCamelCase(declaration.property);
-        return camelCaseProperty === property && declaration.value === value.toString();
+    .every(([property, value]) => {
+      const isMatched = matchingStyleRules.some((rule) => {
+        // Get only property declarations (ignore comments, etc).
+        const propertyName = camelCaseToKebabCase(property);
+        return rule.declarations[propertyName] && rule.declarations[propertyName] === value.toString();
       });
-    })
-  );
+
+      if (!isMatched) {
+        unmatchedProperties.push({ property, value });
+      }
+
+      return isMatched;
+    });
 
   return {
-    message: () => hasMatchingStyleRule ? '' : `Expected element to have CSS styles: ${JSON.stringify(expectedStyles)}`,
+    message: () => generateMessage(unmatchedProperties),
     pass: hasMatchingStyleRule
   };
 };
