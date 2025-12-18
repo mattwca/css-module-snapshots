@@ -20,7 +20,8 @@
     "README.md"
   ],
   "scripts": {
-    "build": "npm run build:main",
+    "clean": "rm -rf dist",
+    "build": "npm run clean && npm run build:main",
     "build:main": "tsc --module commonjs --outDir dist",
     "build:esm": "tsc --module esnext --outDir dist",
     "prepublishOnly": "npm run build",
