@@ -1,7 +1,19 @@
 import css, { CssRuleAST, CssStylesheetAST } from '@adobe/css-tools';
 
 export type StylesheetRule = {
-  selectors: string;
+  /**
+   * The full selector string (e.g. ".class1, .class2").
+   */
+  selector: string;
+
+  /**
+   * The individual selector parts (e.g. [".class1", ".class2"]).
+   */
+  selectorParts: string[];
+  
+  /**
+   * The declarations within the rule (e.g. { color: "red", fontSize: "12px" }).
+   */
   declarations: Record<string, string>;
 }
 
@@ -27,7 +39,8 @@ export class Stylesheet {
     this.rules = this.ast!.stylesheet.rules.reduce<Record<string, StylesheetRule>>((acc, rule) => {
       if (rule.type === 'rule') {
         const cssRule = rule as CssRuleAST;
-        const selectors = cssRule.selectors.join(', ');
+        const { selectors: selectorParts } = cssRule;
+        const selector = selectorParts.join(', ');
 
         const declarations: Record<string, string> = rule.declarations.reduce((declAcc, decl) => {
           if (decl.type === 'declaration') {
@@ -38,8 +51,9 @@ export class Stylesheet {
 
         return {
           ...acc,
-          [selectors]: {
-            selectors,
+          [selector]: {
+            selector,
+            selectorParts: cssRule.selectors,
             declarations,
           }
         };

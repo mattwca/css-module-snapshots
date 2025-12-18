@@ -1,6 +1,8 @@
 import type { MatcherFunction } from 'expect';
 
 import { CSSModuleSnapshotsContext } from './context';
+import { SpecificityCalculator } from './css/specificity';
+import { StylesheetRule } from './context/Stylesheet';
 
 type UnmatchedProperties = {
   property: string;
@@ -42,7 +44,22 @@ export const toHaveCssStyle: MatcherFunction<[expectedStyles: Record<string, str
   CSSModuleSnapshotsContext.instance.addStylesheetsToContext();
 
   const styleRules = CSSModuleSnapshotsContext.instance.styleRules;
-  const matchingStyleRules = styleRules.filter((rule) => actual.matches(rule.selectors));
+  styleRules.forEach((rule) => {
+    rule.selectorParts.forEach((part) => {
+      const specificityCalculator = new SpecificityCalculator(part);
+      specificityCalculator.calculate();
+    })
+  });
+
+  const matchingStyleRules = styleRules.reduce((rules, rule) => {
+    const matchingParts = rule.selectorParts.filter((part) => actual.matches(part));
+
+    rules.push(...matchingParts.map((part) => ({
+      part,
+      rule
+    })));
+    return rules;
+  }, [] as { part: string; rule: StylesheetRule }[]);
 
   const unmatchedProperties: { property: string; value: string | number }[] = [];
 
@@ -50,7 +67,7 @@ export const toHaveCssStyle: MatcherFunction<[expectedStyles: Record<string, str
   const hasMatchingStyleRule = Object
     .entries(expectedStyles)
     .every(([property, value]) => {
-      const isMatched = matchingStyleRules.some((rule) => {
+      const isMatched = matchingStyleRules.some(({ part, rule }) => {
         // Get only property declarations (ignore comments, etc).
         const propertyName = camelCaseToKebabCase(property);
         return rule.declarations[propertyName] && rule.declarations[propertyName] === value.toString();
