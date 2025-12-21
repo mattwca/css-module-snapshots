@@ -29,14 +29,20 @@ class TokenStream {
     return null;
   }
 
-  public consumeExpect(type: TokenType): Token {
+  public consumeExpect(...types: TokenType[]): Token {
     const token = this.consume();
 
-    if (token?.type !== type) {
-      throw new ParsingError(`Expected token of type ${type}, but got ${token?.type || 'end of input'}`);
+    if (!token || !types.includes(token.type)) {
+      throw new ParsingError(`Expected token of type ${types.join(', ')}, but got ${token?.type || 'end of input'}`);
     }
 
     return token;
+  }
+
+  public eatWhitespace() {
+    while (this.peek()?.type === 'whitespace') {
+      this.consume();
+    }
   }
 
   public setPosition(position: number) {
@@ -139,13 +145,24 @@ export class Parser {
     this.parseName();
   }
 
+  private parseCombinator() {
+    this.tokenStream.eatWhitespace();
+    const result = this.tryParseMultiple(this.parseIdentifier.bind(this), this.parseClass.bind(this), this.parseTypeSelector.bind(this));
+    this.tokenStream.eatWhitespace();
+
+    const validOperators: TokenType[] = ['plus', 'left_angle_bracket', 'tilde'];
+    this.tokenStream.consumeExpect(...validOperators);
+  }
+
   public parse() {
-    const test = this.tryParseMultiple(
-      this.parseIdentifier.bind(this),
-      this.parseNumber.bind(this),
-      this.parseClass.bind(this),
-      this.parseTypeSelector.bind(this),
-    );
+    // const test = this.tryParseMultiple(
+    //   this.parseIdentifier.bind(this),
+    //   this.parseNumber.bind(this),
+    //   this.parseClass.bind(this),
+    //   this.parseTypeSelector.bind(this),
+    // );
+
+    this.parseCombinator();
 
     console.log(test);
 
