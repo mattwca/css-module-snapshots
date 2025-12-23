@@ -1,3 +1,4 @@
+import { CombinatorNode, SelectorListNode, SelectorNode } from "./ast";
 import { Token, tokenize, TokenType } from "./tokenizer";
 
 class ParsingError extends Error {
@@ -54,7 +55,7 @@ export class Parser {
   private tokenStream: TokenStream;
   private positionStack: number[];
 
-  constructor(private selector: string) {
+  constructor(selector: string) {
     this.tokenStream = new TokenStream(tokenize(selector));
     this.positionStack = [];
   }
@@ -77,6 +78,9 @@ export class Parser {
     }
   }
 
+  /**
+   * Tries to parse using a given set of parsers, returning the first successful result.
+   */
   private tryParseMultiple(...parseFns: (() => any)[]) {
     for (const parseFn of parseFns) {
       const result = this.tryParse(parseFn);
@@ -88,7 +92,52 @@ export class Parser {
     return null;
   }
 
-  private parseNumber() {
+  /**
+   * Tries to parse using a given set of parsers, until none of them succeed.
+   */
+  private tryParseUntil(parseFn: (() => any)) {
+    const results: any[] = [];
+
+    while (true) {
+      const result = this.tryParse(parseFn);
+
+      if (result === null) {
+        break;
+      }
+
+      results.push(result);
+    }
+
+    return results;
+    
+    // while (true) {
+      // const result = parseFns.some((fn) => {
+      //   try {
+      //     return fn();
+      //   } catch (err) {
+      //     // Ignore errors
+      //     return null;
+      //   }
+      // });
+
+      // console.log(result);
+
+      
+    //   console.log(JSON.stringify(result));
+    //   break;
+
+    //   if (result === null) {
+    //     break;
+    //   }
+
+    //   results.push(result);
+    // }
+  }
+
+  /**
+   * Parses a number from the token stream.
+   */
+  private parseNumber(): number {
     let value = '';
     let token: Token | null;
 
@@ -104,7 +153,10 @@ export class Parser {
     return Number(value);
   }
 
-  private parseName() {
+  /**
+   * Tries to parse a valid CSS name (identifier) from the token stream.
+   */
+  private parseName(): string {
     let value = '';
     let token: Token | null;
 
@@ -123,7 +175,10 @@ export class Parser {
     return value;
   }
 
-  private parseIdentifier() {
+  /**
+   * Parses an ID selector from the token stream.
+   */
+  private parseIdentifier(): string {
     let value = '';
 
     value += this.tokenStream.consumeExpect('hash').value;
@@ -132,6 +187,9 @@ export class Parser {
     return value;
   }
 
+  /**
+   * Parses a class selector from the token stream.
+   */
   private parseClass() {
     let value = '';
 
@@ -141,17 +199,92 @@ export class Parser {
     return value;
   }
 
-  private parseTypeSelector() {
-    this.parseName();
+  /**
+   * Parses a single CSS selector from the token stream.
+   */
+  private parseSelector(): SelectorNode | null {
+    const result = this.tryParseMultiple(
+      this.parseIdentifier.bind(this),
+      this.parseClass.bind(this),
+      this.parseName.bind(this),
+    )
+
+    console.log('parsed selector:', result);
+
+    if (result === null) {
+      console.log(`position = ${JSON.stringify(this.tokenStream.peek())}`);
+    }
+
+    if (result === null) {
+      return null;
+    }
+
+    return {
+      type: 'Selector',
+      value: result!,
+    }
   }
 
-  private parseCombinator() {
-    this.tokenStream.eatWhitespace();
-    const result = this.tryParseMultiple(this.parseIdentifier.bind(this), this.parseClass.bind(this), this.parseTypeSelector.bind(this));
+  /**
+   * Parses a list of CSS selectors from the token stream.
+   */
+  private parseSelectors(): SelectorListNode {
+    const selectors = this.tryParseUntil(this.parseSelector.bind(this));
+
+    return {
+      type: 'SelectorList',
+      selectors,
+    };
+  }
+
+  private parseDescendantCombinator(): CombinatorNode | null {
+    console.log('parsing descendant combinator');
+
+    const left = this.parseSelectors();
+    const operator = this.tokenStream.consumeExpect('whitespace');
+    const right = this.parseCombinator();
+
+    return {
+      type: 'Combinator',
+      operator,
+      left,
+      right,
+    }
+  }
+
+  private parseOtherCombinator(): CombinatorNode | null {
+    console.log('parsing other combinator');
+    const left = this.parseSelectors();
+
+    console.log(`[parseOtherCombinator] left: ${JSON.stringify(left)}`);
+    console.log(`[parseOtherCombinator] position before eating whitespace: ${JSON.stringify(this.tokenStream.peek())}`);
+    
     this.tokenStream.eatWhitespace();
 
-    const validOperators: TokenType[] = ['plus', 'left_angle_bracket', 'tilde'];
-    this.tokenStream.consumeExpect(...validOperators);
+    const validCombinators: TokenType[] = ['left_angle_bracket', 'plus', 'tilde'];
+    
+    const operator = this.tokenStream.consumeExpect(...validCombinators);
+
+    console.log('parsing combinator, operator:', operator);
+
+    this.tokenStream.eatWhitespace();
+
+    const right = this.parseCombinator();
+
+    return {
+      type: 'Combinator',
+      operator,
+      left,
+      right,
+    }
+  }
+
+  private parseCombinator(): CombinatorNode {
+    return this.tryParseMultiple(
+      this.parseOtherCombinator.bind(this),
+      this.parseDescendantCombinator.bind(this),
+      this.parseSelectors.bind(this),
+    )!;
   }
 
   public parse() {
@@ -162,9 +295,11 @@ export class Parser {
     //   this.parseTypeSelector.bind(this),
     // );
 
-    this.parseCombinator();
+    // this.parseCombinator();
 
-    console.log(test);
+    const test = this.parseCombinator();
+
+    console.log(JSON.stringify(test));
 
     return test;
   }

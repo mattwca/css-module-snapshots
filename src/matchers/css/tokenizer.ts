@@ -79,7 +79,7 @@ export const tokenize = (selector: string): Token[] => {
         case '>':
           tokens.push({ type: 'left_angle_bracket', value: char });
           break;
-        case '+':
+        case '<':
           tokens.push({ type: 'right_angle_bracket', value: char });
           break;
         case '$':
