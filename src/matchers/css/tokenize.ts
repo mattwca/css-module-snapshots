@@ -30,7 +30,7 @@ export type Token = {
 
 const letterRegex = /[a-zA-Z]/;
 const digitRegex = /[0-9]/;
-const whitespaceRegex = /\s/;
+const whitespaceRegex = /\s+/;
 
 export const tokenize = (selector: string): Token[] => {
   return selector.split('').reduce<Token[]>((tokens, char) => {

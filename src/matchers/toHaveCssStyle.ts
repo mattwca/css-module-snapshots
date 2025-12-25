@@ -1,7 +1,7 @@
 import type { MatcherFunction } from 'expect';
 
 import { CSSModuleSnapshotsContext } from './context';
-import { SpecificityCalculator } from './css/specificity';
+import { SpecificityCalculator } from './css/SpecificityCalculator';
 import { StylesheetRule } from './context/Stylesheet';
 
 type UnmatchedProperties = {

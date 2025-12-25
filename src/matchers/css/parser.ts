@@ -1,55 +1,30 @@
 import { CombinatorNode, SelectorListNode, SelectorNode } from "./ast";
-import { Token, tokenize, TokenType } from "./tokenizer";
+import { ParsingError } from "./ParsingError";
+import { Token, tokenize, TokenType } from "./tokenize";
+import { TokenStream } from "./TokenStream";
 
-class ParsingError extends Error {
-  constructor(message: string) {
-    super(`Parsing Error: ${message}`);
-  }
+type TryParseResult<T> = {
+  errors: ParsingError[];
+  result: T | null;
 }
 
-class TokenStream {
-  public position: number;
+const isTryParseResult = <T>(obj: any): obj is TryParseResult<T> => {
+  return obj && typeof obj === 'object' && 'errors' in obj && 'result' in obj;
+};
 
-  constructor (private tokens: Token[]) {
-    this.position = 0;
+const unwrapResult = <T>(tryParseResult: T | TryParseResult<T>): TryParseResult<T> => {
+  let result: T | null, errors: ParsingError[];
+
+  if (isTryParseResult(tryParseResult)) {
+    result = tryParseResult.result;
+    errors = tryParseResult.errors;
+  } else {
+    result = tryParseResult as T;
+    errors = [];
   }
 
-  public peek(): Token | null {
-    return this.tokens[this.position] || null;
-  }
-
-  public consume(): Token | null {
-    return this.tokens[this.position++] || null;
-  }
-
-  public consumeIf(type: TokenType): Token | null {
-    const token = this.peek();
-    if (token?.type === type) {
-      return this.consume();
-    }
-    return null;
-  }
-
-  public consumeExpect(...types: TokenType[]): Token {
-    const token = this.consume();
-
-    if (!token || !types.includes(token.type)) {
-      throw new ParsingError(`Expected token of type ${types.join(', ')}, but got ${token?.type || 'end of input'}`);
-    }
-
-    return token;
-  }
-
-  public eatWhitespace() {
-    while (this.peek()?.type === 'whitespace') {
-      this.consume();
-    }
-  }
-
-  public setPosition(position: number) {
-    this.position = position;
-  }
-}
+  return { result, errors };
+};
 
 export class Parser {
   private tokenStream: TokenStream;
@@ -65,73 +40,76 @@ export class Parser {
    * 
    * If the parse fails, the token stream is reset to its original state.
    */
-  private tryParse(parseFn: () => any) {
-    this.positionStack.push(this.tokenStream.position);
+  private tryParse<T>(parseFn: () => T): TryParseResult<T> {
+    this.tokenStream.storePosition();
 
     try {
-      const result = parseFn();
-      this.positionStack.pop();
-      return result;
-    } catch (err) {
-      this.tokenStream.setPosition(this.positionStack.pop()!);
-      return null;
+      const { result, errors } = unwrapResult<T>(parseFn());
+      this.tokenStream.clearPosition();
+
+      return {
+        errors: [],
+        result,
+      };
+    } catch (err: ParsingError | any) {
+      console.log(`[tryParse] caught error: ${err.message}`);
+
+      this.tokenStream.restorePosition();
+
+      return {
+        errors: [err.message],
+        result: null,
+      };
     }
   }
 
   /**
    * Tries to parse using a given set of parsers, returning the first successful result.
    */
-  private tryParseMultiple(...parseFns: (() => any)[]) {
+  private tryParseMultiple<T>(...parseFns: (() => T)[]): TryParseResult<T> {
+    const totalErrors: ParsingError[] = [];
+
     for (const parseFn of parseFns) {
-      const result = this.tryParse(parseFn);
+      const { result, errors } = this.tryParse(parseFn);
+
+      // console.log(`[tryParseMultiple] errors=${JSON.stringify(errors)}`);
+
       if (result !== null) {
-        return result;
+        return { result, errors: [] };
       }
+
+      totalErrors.push(...errors);
     }
 
-    return null;
+    return { result: null, errors: totalErrors };
   }
 
   /**
-   * Tries to parse using a given set of parsers, until none of them succeed.
+   * Tries to parse using a given parser, until it fails.
    */
-  private tryParseUntil(parseFn: (() => any)) {
+  private tryParseUntil(parseFn: (() => any)): TryParseResult<any[]> {
+    const totalErrors: ParsingError[] = [];
     const results: any[] = [];
 
+    let count = 0;
+
     while (true) {
-      const result = this.tryParse(parseFn);
+      const { result, errors } = this.tryParse(parseFn);
+
+      console.log(`[tryParseUntil] errors=${JSON.stringify(errors)}`);
 
       if (result === null) {
+        totalErrors.push(...errors);
         break;
       }
 
       results.push(result);
     }
 
-    return results;
-    
-    // while (true) {
-      // const result = parseFns.some((fn) => {
-      //   try {
-      //     return fn();
-      //   } catch (err) {
-      //     // Ignore errors
-      //     return null;
-      //   }
-      // });
-
-      // console.log(result);
-
-      
-    //   console.log(JSON.stringify(result));
-    //   break;
-
-    //   if (result === null) {
-    //     break;
-    //   }
-
-    //   results.push(result);
-    // }
+    return {
+      errors: results.length === 0 ? totalErrors : [],
+      result: results,
+    };
   }
 
   /**
@@ -202,44 +180,50 @@ export class Parser {
   /**
    * Parses a single CSS selector from the token stream.
    */
-  private parseSelector(): SelectorNode | null {
-    const result = this.tryParseMultiple(
+  private parseSelector(): TryParseResult<SelectorNode> | null {
+    const { result, errors } = this.tryParseMultiple(
       this.parseIdentifier.bind(this),
       this.parseClass.bind(this),
       this.parseName.bind(this),
     )
 
-    console.log('parsed selector:', result);
+    // console.log(`[parseSelector] result=${JSON.stringify(result)}`);
+    console.log(`[parseSelector] errors=${JSON.stringify(errors)}`);
 
     if (result === null) {
-      console.log(`position = ${JSON.stringify(this.tokenStream.peek())}`);
-    }
-
-    if (result === null) {
-      return null;
+      return { result, errors };
     }
 
     return {
+      errors: [],
+      result : {
       type: 'Selector',
       value: result!,
-    }
+      },
+    };
   }
 
   /**
    * Parses a list of CSS selectors from the token stream.
    */
   private parseSelectors(): SelectorListNode {
-    const selectors = this.tryParseUntil(this.parseSelector.bind(this));
+    const { result, errors } = this.tryParseUntil(this.parseSelector.bind(this));
 
-    return {
+    console.log(`[parseSelectors] errors=${JSON.stringify(errors)}`);
+
+    if (result === null || result.length === 0) {
+      throw new ParsingError('Expected at least one selector');
+    }
+
+    const node: SelectorListNode = {
       type: 'SelectorList',
-      selectors,
-    };
+      selectors: result,
+    }
+
+    return node;
   }
 
   private parseDescendantCombinator(): CombinatorNode | null {
-    console.log('parsing descendant combinator');
-
     const left = this.parseSelectors();
     const operator = this.tokenStream.consumeExpect('whitespace');
     const right = this.parseCombinator();
@@ -253,22 +237,13 @@ export class Parser {
   }
 
   private parseOtherCombinator(): CombinatorNode | null {
-    console.log('parsing other combinator');
     const left = this.parseSelectors();
-
-    console.log(`[parseOtherCombinator] left: ${JSON.stringify(left)}`);
-    console.log(`[parseOtherCombinator] position before eating whitespace: ${JSON.stringify(this.tokenStream.peek())}`);
-    
     this.tokenStream.eatWhitespace();
 
-    const validCombinators: TokenType[] = ['left_angle_bracket', 'plus', 'tilde'];
-    
+    const validCombinators: TokenType[] = ['left_angle_bracket', 'plus', 'tilde'];    
     const operator = this.tokenStream.consumeExpect(...validCombinators);
 
-    console.log('parsing combinator, operator:', operator);
-
     this.tokenStream.eatWhitespace();
-
     const right = this.parseCombinator();
 
     return {
@@ -279,33 +254,31 @@ export class Parser {
     }
   }
 
-  private parseCombinator(): CombinatorNode {
-    return this.tryParseMultiple(
+  private parseCombinator(): CombinatorNode | SelectorListNode {
+    const { result, errors } = this.tryParseMultiple<CombinatorNode | SelectorListNode | null>(
       this.parseOtherCombinator.bind(this),
       this.parseDescendantCombinator.bind(this),
       this.parseSelectors.bind(this),
     )!;
+
+    console.log(`[parseCombinator] result=${JSON.stringify(result)}, errors=${JSON.stringify(errors)}`);
+
+    if (result === null) {
+      throw new ParsingError('Failed to parse combinator: ' + errors.map(e => e.message).join('; '));
+    }
+
+    return result;
   }
 
   public parse() {
-    // const test = this.tryParseMultiple(
-    //   this.parseIdentifier.bind(this),
-    //   this.parseNumber.bind(this),
-    //   this.parseClass.bind(this),
-    //   this.parseTypeSelector.bind(this),
-    // );
-
-    // this.parseCombinator();
-
     const test = this.parseCombinator();
+
+    this.tokenStream.eatWhitespace();
+
+    this.tokenStream.expectEndOfInput();
 
     console.log(JSON.stringify(test));
 
     return test;
   }
 }
-
-// .this-is-a-class #id[attr="value"]::after:hover div > span + p ~ a:first-child
-
-// CSS selector that uses all possible syntax features
-// div.class1.class2#id[attr="value"]:hover::after > span + p ~ a:first-child
