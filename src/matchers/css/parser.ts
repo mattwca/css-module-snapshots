@@ -2,43 +2,24 @@ import { CombinatorNode, SelectorListNode, SelectorNode } from "./ast";
 import { ParsingError } from "./ParsingError";
 import { Token, tokenize, TokenType } from "./tokenize";
 import { TokenStream } from "./TokenStream";
+import { TryParseResult, unwrapResult } from "./TryParseResult";
 
-type TryParseResult<T> = {
-  errors: ParsingError[];
-  result: T | null;
-}
-
-const isTryParseResult = <T>(obj: any): obj is TryParseResult<T> => {
-  return obj && typeof obj === 'object' && 'errors' in obj && 'result' in obj;
-};
-
-const unwrapResult = <T>(tryParseResult: T | TryParseResult<T>): TryParseResult<T> => {
-  let result: T | null, errors: ParsingError[];
-
-  if (isTryParseResult(tryParseResult)) {
-    result = tryParseResult.result;
-    errors = tryParseResult.errors;
-  } else {
-    result = tryParseResult as T;
-    errors = [];
-  }
-
-  return { result, errors };
-};
-
+/**
+ * Parser for CSS selectors, implemented using combinators, utilises a TokenStream to read tokens and build an AST.
+ */
 export class Parser {
   private tokenStream: TokenStream;
-  private positionStack: number[];
 
   constructor(selector: string) {
     this.tokenStream = new TokenStream(tokenize(selector));
-    this.positionStack = [];
   }
 
+  // === Combinator Parsing Helpers ===
+
   /**
-   * Attempts to parse using the provided parse function.
-   * 
-   * If the parse fails, the token stream is reset to its original state.
+   * Attempts to parse using the provided parse function. If the parsing fails, the token stream is reset to its original state.
+   * @return {TryParseResult<T>} The result of the parsing attempt, including any errors encountered.
+   * @typeParam T The type of the parsing result.
    */
   private tryParse<T>(parseFn: () => T): TryParseResult<T> {
     this.tokenStream.storePosition();
@@ -52,8 +33,6 @@ export class Parser {
         result,
       };
     } catch (err: ParsingError | any) {
-      console.log(`[tryParse] caught error: ${err.message}`);
-
       this.tokenStream.restorePosition();
 
       return {
@@ -64,15 +43,15 @@ export class Parser {
   }
 
   /**
-   * Tries to parse using a given set of parsers, returning the first successful result.
+   * Tries to parse using a given set of parsers, returning the first successful result, if any.
+   * @return {TryParseResult<T>} The result of the parsing attempt, including accumulated errors encountered.
+   * @typeParam T The type of the parsing result.
    */
   private tryParseMultiple<T>(...parseFns: (() => T)[]): TryParseResult<T> {
     const totalErrors: ParsingError[] = [];
 
     for (const parseFn of parseFns) {
       const { result, errors } = this.tryParse(parseFn);
-
-      // console.log(`[tryParseMultiple] errors=${JSON.stringify(errors)}`);
 
       if (result !== null) {
         return { result, errors: [] };
@@ -85,7 +64,9 @@ export class Parser {
   }
 
   /**
-   * Tries to parse using a given parser, until it fails.
+   * Tries to repeatedly parse with the given parsing function, until it fails.
+   * @return {TryParseResult<T[]>} The result of the parsing attempt, including accumulated errors encountered.
+   * @typeParam T The type of the parsing result.
    */
   private tryParseUntil(parseFn: (() => any)): TryParseResult<any[]> {
     const totalErrors: ParsingError[] = [];
@@ -112,24 +93,26 @@ export class Parser {
     };
   }
 
-  /**
-   * Parses a number from the token stream.
-   */
-  private parseNumber(): number {
-    let value = '';
-    let token: Token | null;
+  // /**
+  //  * Parses a number from the token stream.
+  //  */
+  // private parseNumber(): number {
+  //   let value = '';
+  //   let token: Token | null;
 
-    while (token = this.tokenStream.peek()) {
-      if (token.type !== 'digit') {
-        break;
-      }
+  //   while (token = this.tokenStream.peek()) {
+  //     if (token.type !== 'digit') {
+  //       break;
+  //     }
       
-      const next = this.tokenStream.consume();
-      value += next?.value;
-    }
+  //     const next = this.tokenStream.consume();
+  //     value += next?.value;
+  //   }
 
-    return Number(value);
-  }
+  //   return Number(value);
+  // }
+
+  // === Selectors ===
 
   /**
    * Tries to parse a valid CSS name (identifier) from the token stream.
@@ -187,9 +170,6 @@ export class Parser {
       this.parseName.bind(this),
     )
 
-    // console.log(`[parseSelector] result=${JSON.stringify(result)}`);
-    console.log(`[parseSelector] errors=${JSON.stringify(errors)}`);
-
     if (result === null) {
       return { result, errors };
     }
@@ -204,13 +184,10 @@ export class Parser {
   }
 
   /**
-   * Parses a list of CSS selectors from the token stream.
+   * Parses a compound CSS selector (one or more selectors not separated by a combinator) from the token stream.
    */
-  private parseSelectors(): SelectorListNode {
-    const { result, errors } = this.tryParseUntil(this.parseSelector.bind(this));
-
-    console.log(`[parseSelectors] errors=${JSON.stringify(errors)}`);
-
+  private parseCompoundSelector(): SelectorListNode {
+    const { result } = this.tryParseUntil(this.parseSelector.bind(this));
     if (result === null || result.length === 0) {
       throw new ParsingError('Expected at least one selector');
     }
@@ -223,8 +200,10 @@ export class Parser {
     return node;
   }
 
+  // === Combinators ===
+
   private parseDescendantCombinator(): CombinatorNode | null {
-    const left = this.parseSelectors();
+    const left = this.parseCompoundSelector();
     const operator = this.tokenStream.consumeExpect('whitespace');
     const right = this.parseCombinator();
 
@@ -237,7 +216,7 @@ export class Parser {
   }
 
   private parseOtherCombinator(): CombinatorNode | null {
-    const left = this.parseSelectors();
+    const left = this.parseCompoundSelector();
     this.tokenStream.eatWhitespace();
 
     const validCombinators: TokenType[] = ['left_angle_bracket', 'plus', 'tilde'];    
@@ -258,10 +237,8 @@ export class Parser {
     const { result, errors } = this.tryParseMultiple<CombinatorNode | SelectorListNode | null>(
       this.parseOtherCombinator.bind(this),
       this.parseDescendantCombinator.bind(this),
-      this.parseSelectors.bind(this),
+      this.parseCompoundSelector.bind(this),
     )!;
-
-    console.log(`[parseCombinator] result=${JSON.stringify(result)}, errors=${JSON.stringify(errors)}`);
 
     if (result === null) {
       throw new ParsingError('Failed to parse combinator: ' + errors.map(e => e.message).join('; '));
@@ -270,11 +247,10 @@ export class Parser {
     return result;
   }
 
+  // == Entry Point ==
+
   public parse() {
     const test = this.parseCombinator();
-
-    this.tokenStream.eatWhitespace();
-
     this.tokenStream.expectEndOfInput();
 
     console.log(JSON.stringify(test));

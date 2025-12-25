@@ -93,6 +93,9 @@ export class TokenStream {
    * @throws {ParsingError} If the end of the input has not been reached.
    */
   public expectEndOfInput() {
+    // Consume any trailing whitespace.
+    this.eatWhitespace();
+
     if (this.peek() !== null) {
       throw new ParsingError(`Expected end of input, but got token of type ${this.peek()!.type}`);
     }
