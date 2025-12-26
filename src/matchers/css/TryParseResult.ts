@@ -31,3 +31,21 @@ export const unwrapResult = <T>(tryParseResult: T | TryParseResult<T>): TryParse
 
   return { result, errors };
 };
+
+/**
+ * Unwraps a TryParseResult or throws an error if parsing failed.
+ * @param tryParseResult The TryParseResult to unwrap.
+ * @param errorMessage Optional custom error message to use if parsing failed.
+ * @returns The parsed result if successful.
+ * @throws {ParsingError} If parsing failed, with accumulated error messages.
+ */
+export const unwrapResultOrThrow = <T>(tryParseResult: T | TryParseResult<T>, errorMessage?: string): T => {
+  const { result, errors } = unwrapResult(tryParseResult);
+
+  if (result === null || (Array.isArray(result) && result.length === 0)) {
+    const errorMessages = errors.map(err => err.message).join('; ');
+    throw new ParsingError(errorMessage ?? errorMessages);
+  }
+
+  return result;
+};

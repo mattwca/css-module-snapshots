@@ -100,4 +100,8 @@ export class TokenStream {
       throw new ParsingError(`Expected end of input, but got token of type ${this.peek()!.type}`);
     }
   }
+
+  public peekRemainder(): string {
+    return this.tokens.slice(this.position).map(t => t.value).join('');
+  }
 }

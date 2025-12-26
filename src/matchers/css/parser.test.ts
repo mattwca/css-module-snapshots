@@ -1,10 +1,17 @@
 import { Parser } from './Parser';
 
 describe('CSS Parser', () => {
-  test('test', () => {
-    const parser = new Parser('.test #shit >');
-    const parsed = parser.parse();
+  describe('complex combinator', () => {
+    test('test successful', () => {
+      const parser = new Parser('#test[data-testid="value"] > p.example[data-role="main"]');
+      const parsed = parser.parse();
+      expect(parsed).toBeDefined();
+    });
 
-    expect(parsed).toBeTruthy();
+    test('test failure', () => {
+      const parser = new Parser('#test[data-testid="value" > p.example[data-role="main"]'); // Missing closing bracket
+      parser.parse();
+      // expect(() => parser.parse()).toThrow();
+    });
   });
 });

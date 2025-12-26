@@ -1,8 +1,8 @@
-import { CombinatorNode, SelectorListNode, SelectorNode } from "./ast";
+import { AttributeSelectorNode, CombinatorNode, CompoundSelectorNode, Expression, SelectorNode, StringNode } from "./ast";
 import { ParsingError } from "./ParsingError";
 import { Token, tokenize, TokenType } from "./tokenize";
 import { TokenStream } from "./TokenStream";
-import { TryParseResult, unwrapResult } from "./TryParseResult";
+import { TryParseResult, unwrapResult, unwrapResultOrThrow } from "./TryParseResult";
 
 /**
  * Parser for CSS selectors, implemented using combinators, utilises a TokenStream to read tokens and build an AST.
@@ -60,6 +60,8 @@ export class Parser {
       totalErrors.push(...errors);
     }
 
+    console.log('tryParseMultiple totalErrors:', totalErrors);
+
     return { result: null, errors: totalErrors };
   }
 
@@ -77,8 +79,6 @@ export class Parser {
     while (true) {
       const { result, errors } = this.tryParse(parseFn);
 
-      console.log(`[tryParseUntil] errors=${JSON.stringify(errors)}`);
-
       if (result === null) {
         totalErrors.push(...errors);
         break;
@@ -90,6 +90,22 @@ export class Parser {
     return {
       errors: results.length === 0 ? totalErrors : [],
       result: results,
+    };
+  }
+
+  /**
+   * Combines two parsing functions into one, returning a tuple of their results.
+   * @return {() => [T, U]} A new parsing function that returns a tuple of the results from the two input parsing functions.
+   * @typeParam T The type of the first parsing result.
+   * @typeParam U The type of the second parsing result.
+   * @throws {ParsingError} If either of the parsing functions fail.
+   */
+  private and<T, U>(parseFn1: () => T, parseFn2: () => U): () => [T, U] {
+    return () => {
+      const result1 = parseFn1();
+      const result2 = parseFn2();
+
+      return [result1, result2];
     };
   }
 
@@ -117,7 +133,7 @@ export class Parser {
   /**
    * Tries to parse a valid CSS name (identifier) from the token stream.
    */
-  private parseName(): string {
+  private parseName(): SelectorNode {
     let value = '';
     let token: Token | null;
 
@@ -133,79 +149,131 @@ export class Parser {
       value += next?.value;
     }
 
-    return value;
+    return {
+      type: 'Selector',
+      value,
+    }
   }
 
   /**
    * Parses an ID selector from the token stream.
    */
-  private parseIdentifier(): string {
-    let value = '';
+  private parseIdentifier(): SelectorNode {
+    console.log(this.tokenStream.consumeExpect('hash'));
+    let { value: name } = this.parseName();
 
-    value += this.tokenStream.consumeExpect('hash').value;
-    value += this.parseName();
-
-    return value;
+    return {
+      type: 'Selector',
+      value: `#${name}`,
+    }
   }
 
   /**
    * Parses a class selector from the token stream.
    */
-  private parseClass() {
+  private parseClass(): SelectorNode {
+    this.tokenStream.consumeExpect('period');
+    let { value: className } = this.parseName();
+
+    return {
+      type: 'Selector',
+      value: `.${className}`,
+    }
+  }
+
+  private parseString(): StringNode {
     let value = '';
 
-    value += this.tokenStream.consumeExpect('period').value;
-    value += this.parseName();
+    value += this.tokenStream.consumeExpect('quote').value;
 
-    return value;
+    while (true) {
+      const next = this.tokenStream.consume();
+      if (next === null) {
+        throw new ParsingError('Unterminated string literal');
+      }
+
+      if (next.type === 'quote') {
+        value += next.value;
+        break;
+      }
+
+      value += next.value;
+    }
+
+    return {
+      type: 'String',
+      value,
+    };
+  }
+
+  private parseExpression(): Expression {
+    const attribute = this.parseName();
+    const operator = this.tokenStream.consumeExpect('tilde', 'pipe', 'caret', 'dollar', 'asterisk', 'equals').value;
+    const optionalOperator = this.tokenStream.consumeIf('equals')
+    const value = this.tryParseMultiple<StringNode | SelectorNode>(this.parseString.bind(this), this.parseName.bind(this));
+
+    if (value.result === null) {
+      throw new ParsingError('Expected string or name as attribute selector value');
+    }
+
+    return {
+      type: 'Expression',
+      attribute,
+      operator: operator + (optionalOperator ? optionalOperator.value : ''),
+      value: value.result,
+    };
+  }
+
+  private parseAttributeSelector(): AttributeSelectorNode {
+    console.log(this.tokenStream.peekRemainder())
+
+    this.tokenStream.consumeExpect('left_bracket').value;
+    const expression = this.parseExpression();
+
+    console.log(this.tokenStream.peekRemainder());
+    this.tokenStream.consumeExpect('right_bracket').value;
+
+    return {
+      type: 'AttributeSelector',
+      expression,
+    };
   }
 
   /**
    * Parses a single CSS selector from the token stream.
    */
-  private parseSelector(): TryParseResult<SelectorNode> | null {
-    const { result, errors } = this.tryParseMultiple(
+  private parseSelector(): SelectorNode | AttributeSelectorNode {
+    const result = this.tryParseMultiple<SelectorNode | AttributeSelectorNode>(
       this.parseIdentifier.bind(this),
       this.parseClass.bind(this),
       this.parseName.bind(this),
-    )
+      this.parseAttributeSelector.bind(this)
+    );
 
-    if (result === null) {
-      return { result, errors };
-    }
-
-    return {
-      errors: [],
-      result : {
-      type: 'Selector',
-      value: result!,
-      },
-    };
+    return unwrapResultOrThrow(result);
   }
 
   /**
    * Parses a compound CSS selector (one or more selectors not separated by a combinator) from the token stream.
    */
-  private parseCompoundSelector(): SelectorListNode {
-    const { result } = this.tryParseUntil(this.parseSelector.bind(this));
-    if (result === null || result.length === 0) {
-      throw new ParsingError('Expected at least one selector');
-    }
+  private parseCompoundSelector(): CompoundSelectorNode {
+    const result = this.tryParseUntil(this.parseSelector.bind(this));
+    const selectors = unwrapResultOrThrow(result, 'Expected at least one selector');
 
-    const node: SelectorListNode = {
-      type: 'SelectorList',
-      selectors: result,
+    const node: CompoundSelectorNode = {
+      type: 'CompoundSelector',
+      selectors,
     }
 
     return node;
   }
 
-  // === Combinators ===
+  // === CSS Combinators ===
 
-  private parseDescendantCombinator(): CombinatorNode | null {
+  private parseDescendantCombinator(): CombinatorNode {
     const left = this.parseCompoundSelector();
     const operator = this.tokenStream.consumeExpect('whitespace');
-    const right = this.parseCombinator();
+    const right = this.parseComplexSelector();
 
     return {
       type: 'Combinator',
@@ -215,7 +283,7 @@ export class Parser {
     }
   }
 
-  private parseOtherCombinator(): CombinatorNode | null {
+  private parseOtherCombinator(): CombinatorNode {
     const left = this.parseCompoundSelector();
     this.tokenStream.eatWhitespace();
 
@@ -223,7 +291,7 @@ export class Parser {
     const operator = this.tokenStream.consumeExpect(...validCombinators);
 
     this.tokenStream.eatWhitespace();
-    const right = this.parseCombinator();
+    const right = this.parseComplexSelector();
 
     return {
       type: 'Combinator',
@@ -233,25 +301,27 @@ export class Parser {
     }
   }
 
-  private parseCombinator(): CombinatorNode | SelectorListNode {
-    const { result, errors } = this.tryParseMultiple<CombinatorNode | SelectorListNode | null>(
+  /**
+   * Parses a complex CSS selector, which may include combinators, from the token stream.
+   */
+  private parseComplexSelector(): CombinatorNode | CompoundSelectorNode | SelectorNode | AttributeSelectorNode {
+    const tryParseResult = this.tryParseMultiple<CombinatorNode | CompoundSelectorNode | SelectorNode | AttributeSelectorNode>(
       this.parseOtherCombinator.bind(this),
       this.parseDescendantCombinator.bind(this),
       this.parseCompoundSelector.bind(this),
     )!;
 
-    if (result === null) {
-      throw new ParsingError('Failed to parse combinator: ' + errors.map(e => e.message).join('; '));
-    }
+    console.log(`tryParseResult: ${JSON.stringify(tryParseResult)}`);
 
-    return result;
+    const selector = unwrapResultOrThrow(tryParseResult, 'Failed to parse complex selector')
+    return selector;
   }
 
   // == Entry Point ==
 
   public parse() {
-    const test = this.parseCombinator();
-    this.tokenStream.expectEndOfInput();
+    const test = this.parseComplexSelector();
+    // this.tokenStream.expectEndOfInput();
 
     console.log(JSON.stringify(test));
 
