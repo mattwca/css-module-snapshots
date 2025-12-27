@@ -1,5 +1,5 @@
 import { ParsingError } from "./ParsingError";
-import { Token, TokenType } from "./tokenize";
+import { Token, TokenType, ParsingErrorPosition } from "./types";
 
 /**
  * Represents a stream of tokens for parsing, including methods to consume and peek tokens,
@@ -51,7 +51,7 @@ export class TokenStream {
     const token = this.consume();
 
     if (!token || !types.includes(token.type)) {
-      throw new ParsingError(`Expected token of type ${types.join(', ')}, but got ${token?.type || 'end of input'}`);
+      throw new ParsingError(`Expected token of type ${types.join(', ')}, but got ${token?.type || 'end of input'}`, this.getPositionForError());
     }
 
     return token;
@@ -97,11 +97,20 @@ export class TokenStream {
     this.eatWhitespace();
 
     if (this.peek() !== null) {
-      throw new ParsingError(`Expected end of input, but got token of type ${this.peek()!.type}`);
+      throw new ParsingError(`Expected end of input, but got token of type ${this.peek()!.type}`, this.getPositionForError());
     }
   }
 
   public peekRemainder(): string {
     return this.tokens.slice(this.position).map(t => t.value).join('');
+  }
+
+  public getPositionForError(): ParsingErrorPosition {
+    const tokenToUse = this.peek() || this.tokens[this.tokens.length - 1];
+
+    return {
+      position: this.position,
+      ...tokenToUse.position,
+    };
   }
 }

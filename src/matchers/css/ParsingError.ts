@@ -1,8 +1,14 @@
+import { ParsingErrorPosition } from "./types";
+
 /**
  * Represents a parsing error with a specific message.
  */
 export class ParsingError extends Error {
-  constructor(message: string, location?: { line: number; column: number }) {
-    super(`Parsing Error: ${message}`);
+  public location: ParsingErrorPosition;
+
+  constructor(message: string, location: ParsingErrorPosition) {
+    super(`Parsing Error [${location.line}:${location.column}]: ${message}`);
+
+    this.location = location;
   }
 }

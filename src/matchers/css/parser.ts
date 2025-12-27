@@ -1,23 +1,48 @@
 import { AttributeSelectorNode, CombinatorNode, CompoundSelectorNode, Expression, SelectorNode, StringNode } from "./ast";
 import { ParsingError } from "./ParsingError";
-import { Token, tokenize, TokenType } from "./tokenize";
+import { tokenize } from "./tokenize";
 import { TokenStream } from "./TokenStream";
 import { TryParseResult, unwrapResult, unwrapResultOrThrow } from "./TryParseResult";
+import { Token, TokenType } from "./types";
 
 /**
- * Parser for CSS selectors, implemented using combinators, utilises a TokenStream to read tokens and build an AST.
+ * Backtracking parser for CSS selectors, implemented using combinators, utilises a TokenStream to read tokens and build an AST.
  */
 export class Parser {
+  /**
+   * The stream of tokens from the input selector string.
+   */
   private tokenStream: TokenStream;
 
+  /**
+   * The deepest parsing error encountered during parsing.
+   * 
+   * Used to track the most relevant error to report back to the user.
+   */
+  private deepestError: ParsingError | null;
+
+  /**
+   * Creates a new CSS selector parser instance.
+   * @param selector The CSS selector string to parse.
+   */
   constructor(selector: string) {
     this.tokenStream = new TokenStream(tokenize(selector));
+    this.deepestError = null;
+  }
+
+  private onErrorRaised(error: ParsingError) {
+    if (!!this.deepestError && this.deepestError.location.position > error.location.position) {
+      return;
+    }
+
+    this.deepestError = error;
   }
 
   // === Combinator Parsing Helpers ===
 
   /**
    * Attempts to parse using the provided parse function. If the parsing fails, the token stream is reset to its original state.
+   * Foundation for implementing backtracking in the parser.
    * @return {TryParseResult<T>} The result of the parsing attempt, including any errors encountered.
    * @typeParam T The type of the parsing result.
    */
@@ -35,8 +60,12 @@ export class Parser {
     } catch (err: ParsingError | any) {
       this.tokenStream.restorePosition();
 
+      // If this is the deepest error so far (parser that made it to the furthest point), we store it in the parser
+      // state for later reporting.
+      this.onErrorRaised(err);
+
       return {
-        errors: [err.message],
+        errors: [err],
         result: null,
       };
     }
@@ -59,8 +88,6 @@ export class Parser {
 
       totalErrors.push(...errors);
     }
-
-    console.log('tryParseMultiple totalErrors:', totalErrors);
 
     return { result: null, errors: totalErrors };
   }
@@ -120,7 +147,7 @@ export class Parser {
   //     if (token.type !== 'digit') {
   //       break;
   //     }
-      
+
   //     const next = this.tokenStream.consume();
   //     value += next?.value;
   //   }
@@ -159,7 +186,7 @@ export class Parser {
    * Parses an ID selector from the token stream.
    */
   private parseIdentifier(): SelectorNode {
-    console.log(this.tokenStream.consumeExpect('hash'));
+    this.tokenStream.consumeExpect('hash');
     let { value: name } = this.parseName();
 
     return {
@@ -189,7 +216,7 @@ export class Parser {
     while (true) {
       const next = this.tokenStream.consume();
       if (next === null) {
-        throw new ParsingError('Unterminated string literal');
+        throw new ParsingError('Unterminated string literal', this.tokenStream.getPositionForError());
       }
 
       if (next.type === 'quote') {
@@ -210,27 +237,23 @@ export class Parser {
     const attribute = this.parseName();
     const operator = this.tokenStream.consumeExpect('tilde', 'pipe', 'caret', 'dollar', 'asterisk', 'equals').value;
     const optionalOperator = this.tokenStream.consumeIf('equals')
-    const value = this.tryParseMultiple<StringNode | SelectorNode>(this.parseString.bind(this), this.parseName.bind(this));
-
-    if (value.result === null) {
-      throw new ParsingError('Expected string or name as attribute selector value');
-    }
+    const value = unwrapResultOrThrow(
+      this.tryParseMultiple<StringNode | SelectorNode>(this.parseString.bind(this), this.parseName.bind(this)),
+      this.tokenStream.getPositionForError(),
+      'Expected string or name as attribute selector value'
+    );
 
     return {
       type: 'Expression',
       attribute,
       operator: operator + (optionalOperator ? optionalOperator.value : ''),
-      value: value.result,
+      value,
     };
   }
 
   private parseAttributeSelector(): AttributeSelectorNode {
-    console.log(this.tokenStream.peekRemainder())
-
     this.tokenStream.consumeExpect('left_bracket').value;
     const expression = this.parseExpression();
-
-    console.log(this.tokenStream.peekRemainder());
     this.tokenStream.consumeExpect('right_bracket').value;
 
     return {
@@ -250,7 +273,7 @@ export class Parser {
       this.parseAttributeSelector.bind(this)
     );
 
-    return unwrapResultOrThrow(result);
+    return unwrapResultOrThrow(result, this.tokenStream.getPositionForError());
   }
 
   /**
@@ -258,7 +281,8 @@ export class Parser {
    */
   private parseCompoundSelector(): CompoundSelectorNode {
     const result = this.tryParseUntil(this.parseSelector.bind(this));
-    const selectors = unwrapResultOrThrow(result, 'Expected at least one selector');
+
+    const selectors = unwrapResultOrThrow(result, this.tokenStream.getPositionForError(), 'Expected at least one selector');
 
     const node: CompoundSelectorNode = {
       type: 'CompoundSelector',
@@ -287,7 +311,7 @@ export class Parser {
     const left = this.parseCompoundSelector();
     this.tokenStream.eatWhitespace();
 
-    const validCombinators: TokenType[] = ['left_angle_bracket', 'plus', 'tilde'];    
+    const validCombinators: TokenType[] = ['left_angle_bracket', 'plus', 'tilde'];
     const operator = this.tokenStream.consumeExpect(...validCombinators);
 
     this.tokenStream.eatWhitespace();
@@ -311,19 +335,25 @@ export class Parser {
       this.parseCompoundSelector.bind(this),
     )!;
 
-    console.log(`tryParseResult: ${JSON.stringify(tryParseResult)}`);
-
-    const selector = unwrapResultOrThrow(tryParseResult, 'Failed to parse complex selector')
+    const selector = unwrapResultOrThrow(tryParseResult, this.tokenStream.getPositionForError());
     return selector;
   }
 
   // == Entry Point ==
 
   public parse() {
-    const test = this.parseComplexSelector();
-    // this.tokenStream.expectEndOfInput();
+    try {
+      const test = this.parseComplexSelector();
+      this.tokenStream.expectEndOfInput();
+    } catch (err: ParsingError | any) {
+      if (err instanceof ParsingError) {
+        if (this.deepestError && this.deepestError.location.position > err.location.position) {
+          throw this.deepestError;
+        }
+      }
 
-    console.log(JSON.stringify(test));
+      throw err;
+    }
 
     return test;
   }
