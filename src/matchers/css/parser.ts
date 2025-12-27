@@ -235,24 +235,39 @@ export class Parser {
 
   private parseExpression(): Expression {
     const attribute = this.parseName();
-    const operator = this.tokenStream.consumeExpect('tilde', 'pipe', 'caret', 'dollar', 'asterisk', 'equals').value;
-    const optionalOperator = this.tokenStream.consumeIf('equals')
-    const value = unwrapResultOrThrow(
-      this.tryParseMultiple<StringNode | SelectorNode>(this.parseString.bind(this), this.parseName.bind(this)),
-      this.tokenStream.getPositionForError(),
-      'Expected string or name as attribute selector value'
-    );
+
+    const parseComplexExpressionParts = () => {
+      this.tokenStream.eatWhitespace();
+
+      let operator = this.tokenStream.consumeIf('tilde', 'pipe', 'caret', 'dollar', 'asterisk')?.value || '';
+      operator += this.tokenStream.consumeExpect('equals').value;
+
+      this.tokenStream.eatWhitespace();
+
+      const value = unwrapResultOrThrow(
+        this.tryParseMultiple<StringNode | SelectorNode>(this.parseString.bind(this), this.parseName.bind(this)),
+        this.tokenStream.getPositionForError(),
+        'Expected string or name as attribute selector value'
+      );
+
+      return {
+        operator,
+        value,
+      }
+    };
+
+    const complexPartsResult = this.tryParse(parseComplexExpressionParts);
 
     return {
       type: 'Expression',
       attribute,
-      operator: operator + (optionalOperator ? optionalOperator.value : ''),
-      value,
+      ...complexPartsResult.result,
     };
   }
 
   private parseAttributeSelector(): AttributeSelectorNode {
     this.tokenStream.consumeExpect('left_bracket').value;
+
     const expression = this.parseExpression();
     this.tokenStream.consumeExpect('right_bracket').value;
 
@@ -345,6 +360,7 @@ export class Parser {
     try {
       const test = this.parseComplexSelector();
       this.tokenStream.expectEndOfInput();
+      return test;
     } catch (err: ParsingError | any) {
       if (err instanceof ParsingError) {
         if (this.deepestError && this.deepestError.location.position > err.location.position) {
@@ -354,7 +370,5 @@ export class Parser {
 
       throw err;
     }
-
-    return test;
   }
 }

@@ -17,8 +17,8 @@ export interface StringNode extends Node {
 export interface Expression extends Node {
   type: 'Expression',
   attribute: SelectorNode;
-  operator: string;
-  value: SelectorNode | StringNode;
+  operator?: string;
+  value?: SelectorNode | StringNode;
 }
 
 export interface AttributeSelectorNode extends Node {

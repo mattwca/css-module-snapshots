@@ -34,9 +34,9 @@ export class TokenStream {
    * Consumes a token if it matches the expected type.
    * @returns The consumed token, or null if the next token does not match the expected type.
    */
-  public consumeIf(type: TokenType): Token | null {
+  public consumeIf(...types: TokenType[]): Token | null {
     const token = this.peek();
-    if (token?.type === type) {
+    if (token && types.includes(token.type)) {
       return this.consume();
     }
     return null;
