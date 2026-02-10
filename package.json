@@ -1,29 +1,30 @@
 {
   "name": "@mattwca/css-module-snapshots",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Adds support for testing when using CSS Modules in Jest, including snapshots and style matching.",
-  "main": "dist/index.js",
-  "types": "types/index.d.ts",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./types/index.d.ts",
+  "engines": {
+    "node": ">=14"
+  },
   "exports": {
     ".": {
       "types": "./types/index.d.ts",
-      "require": "./dist/index.js"
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
     },
     "./transformer": {
-      "require": "./dist/transformer/cssModuleTransformer.js"
+      "require": "./dist/transformer/cssModuleTransformer.cjs"
     }
   },
   "files": [
     "dist",
-    "src",
     "types",
     "README.md"
   ],
   "scripts": {
-    "clean": "rm -rf dist",
-    "build": "npm run clean && npm run build:main",
-    "build:main": "tsc --module commonjs --outDir dist",
-    "build:esm": "tsc --module esnext --outDir dist",
+    "build": "tsdown",
     "prepublishOnly": "npm run build",
     "test": "jest",
     "lint": "eslint src --ext .ts,.js,.cjs"
@@ -37,7 +38,7 @@
     "serializer",
     "matcher"
   ],
-  "author": "",
+  "author": "@mattwca",
   "license": "MIT",
   "dependencies": {
     "@adobe/css-tools": "^4.4.4",
@@ -54,6 +55,7 @@
     "@typescript-eslint/parser": "^6.13.1",
     "eslint": "^8.54.0",
     "jest": "^29.7.0",
+    "tsdown": "^0.20.3",
     "typescript": "^5.3.2"
   },
   "repository": {

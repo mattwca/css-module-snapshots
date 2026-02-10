@@ -3,9 +3,9 @@ const visitedNodes = new Set();
 
 /**
  * Helper function to get all nodes in the DOM tree, given a root node.
- * @param {*} node The root node to start searching from.
- * @param {*} nodes The array of nodes to add to.
- * @returns {Array} The array of nodes.
+ * @param node The root node to start searching from.
+ * @param nodes The array of nodes to add to.
+ * @returns The array of nodes.
  */
 const getNodes = (node: Element, nodes: Element[] = []) => {
   if (typeof node === 'object') {
@@ -24,7 +24,7 @@ const getNodes = (node: Element, nodes: Element[] = []) => {
  * finds all elements which are using CSS module class names, and serializes the associated styles
  * into the snapshot.
  */
-export const cssModuleSnapshotSerializer = {
+export const cssModuleSnapshotSerializer: jest.SnapshotSerializerPlugin = {
   test: (val: Node) => {
     // Skip any nodes which have already been 'visited'.
     if (visitedNodes.has(val)) {
@@ -38,7 +38,7 @@ export const cssModuleSnapshotSerializer = {
 
     return true;
   },
-  serialize: (val: any, config: any, indentation: any, depth: any, refs: any, printer: any) => {
+  serialize: (val, config, indentation, depth, refs, printer) => {
     // Get all nodes that are children of the root node and add them to the visited nodes set.
     const nodes = getNodes(val);
     nodes.forEach((node) => visitedNodes.add(node));

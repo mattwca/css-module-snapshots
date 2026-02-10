@@ -52,4 +52,4 @@ export class CSSModuleSnapshotsContext {
   get styleRules(): StylesheetRule[] {
     return Array.from(this.styleSheets.values()).flatMap((stylesheet) => stylesheet.rulesArray);
   }
-};
+}
