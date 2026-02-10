@@ -15,7 +15,6 @@
       "require": "./dist/index.cjs"
     },
     "./transformer": {
-      "import": "./dist/transformer/cssModuleTransformer.mjs",
       "require": "./dist/transformer/cssModuleTransformer.cjs"
     }
   },
