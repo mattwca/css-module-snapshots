@@ -1,4 +1,3 @@
-/* eslint-disable import/no-default-export */
 import fs from 'fs';
 import crypto from 'crypto';
 
