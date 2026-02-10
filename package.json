@@ -35,7 +35,7 @@
     "serializer",
     "matcher"
   ],
-  "author": "",
+  "author": "@mattwca",
   "license": "MIT",
   "dependencies": {
     "@adobe/css-tools": "^4.4.4",
