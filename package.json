@@ -5,6 +5,9 @@
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
   "types": "./types/index.d.ts",
+  "engines": {
+    "node": ">=20.19.0"
+  },
   "exports": {
     ".": {
       "types": "./types/index.d.ts",
@@ -23,6 +26,7 @@
   ],
   "scripts": {
     "build": "tsdown",
+    "prepublishOnly": "npm run build",
     "test": "jest",
     "lint": "eslint src --ext .ts,.js,.cjs"
   },
