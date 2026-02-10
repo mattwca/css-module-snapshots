@@ -6,7 +6,7 @@
   "module": "./dist/index.mjs",
   "types": "./types/index.d.ts",
   "engines": {
-    "node": ">=20.19.0"
+    "node": ">=14"
   },
   "exports": {
     ".": {
